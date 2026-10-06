@@ -1,0 +1,20 @@
+# affine-mcp-server as a Harbor app. The image's own entrypoint (node bin/affine-mcp) runs
+# unchanged. AFFINE_BASE_URL comes from the `affine` link (http://affine-link:3010), the AFFiNE
+# account and the MCP bearer token from values the operator types at install; nothing secret
+# lives in this file. The link network is private and plain http, hence ALLOW_INSECURE_HTTP.
+services:
+  affine-mcp:
+    # 3.8.0
+    image: ghcr.io/dawncr0w/affine-mcp-server@sha256:7793e3690411ec10e7c2c34f4a2d821d763670938e21cdfdc8041a7772f6806b
+    environment:
+      MCP_TRANSPORT: http
+      AFFINE_MCP_HTTP_HOST: 0.0.0.0
+      PORT: "3000"
+      AFFINE_MCP_AUTH_MODE: bearer
+      AFFINE_ALLOW_INSECURE_HTTP: "true"
+      AFFINE_TOOL_PROFILE: full
+    healthcheck:
+      test: [CMD, wget, -qO-, http://127.0.0.1:3000/healthz]
+      interval: 30s
+      timeout: 5s
+      retries: 3

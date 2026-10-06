@@ -1,0 +1,78 @@
+apiVersion: harbor/v1alpha1
+kind: Application
+metadata:
+  id: affine-mcp
+  name: "AFFiNE MCP"
+  description: "MCP gateway for AFFiNE: lets AI assistants read and edit your AFFiNE workspaces over HTTP, signed in as one AFFiNE account."
+release:
+  revision: "1"
+  version: "3.8.0"
+deployment:
+  compose: compose.yaml
+  multiInstance: true
+  services:
+    affine-mcp: application
+# An HTTP API for MCP clients (POST /mcp with a bearer token), not a page for a browser.
+endpoints:
+  mcp:
+    service: affine-mcp
+    containerPort: 3000
+    scheme: http
+    exposure: direct
+    browserContext: ordinary
+# /healthz answers without the bearer token and without reaching AFFiNE, so the gateway is
+# healthy as soon as it listens (sign-in to AFFiNE runs in the background). /readyz would also
+# check AFFiNE itself; it is left to clients and the README.
+health:
+  endpoint: mcp
+  path: /healthz
+  expectedStatus: [200]
+  timeoutSeconds: 5
+  deadlineSeconds: 90
+ui:
+  primaryEndpoint: mcp
+setup:
+  endpoint: mcp
+  instructions: "Not a web page: point an MCP client at this app's address followed by /mcp, with the header Authorization: Bearer followed by the MCP access token typed at install. /healthz shows whether it is up; /readyz whether it reaches AFFiNE."
+# AFFiNE is reached privately: Harbor puts this gateway and AFFiNE's web service on one
+# internal network, where AFFiNE answers as affine-link:3010.
+links:
+  - id: affine
+    purpose: "The AFFiNE app this gateway reads and writes"
+    provider:
+      packages: [affine]
+      endpoint: web
+    optional: false
+    bindings:
+      - service: affine-mcp
+        environment: AFFINE_BASE_URL
+        format: url
+secrets:
+  - id: affine-email
+    source: operator
+    prompt: "Email of the AFFiNE account the gateway acts as (an existing AFFiNE user)"
+    minLength: 3
+    maxLength: 254
+    retention: retain
+    bindings:
+      - {service: affine-mcp, environment: AFFINE_EMAIL}
+  - id: affine-password
+    source: operator
+    prompt: "Password of that AFFiNE account"
+    retention: retain
+    bindings:
+      - {service: affine-mcp, environment: AFFINE_PASSWORD}
+  - id: mcp-http-token
+    source: operator
+    prompt: "MCP access token: the bearer token MCP clients send (keep your current one when moving; else a long random string, e.g. openssl rand -hex 32)"
+    minLength: 16
+    maxLength: 512
+    retention: retain
+    bindings:
+      - {service: affine-mcp, environment: AFFINE_MCP_HTTP_TOKEN}
+presentation:
+  tagline: "Your AFFiNE workspaces for AI assistants, over MCP"
+  category: ai
+  developer: "DAWNCR0W (affine-mcp-server), packaged for Harbor"
+  website: https://github.com/dawncr0w/affine-mcp-server
+  releaseNotes: "Revision 1: affine-mcp-server 3.8.0 over streamable HTTP with a bearer token, linked privately to the AFFiNE app."
